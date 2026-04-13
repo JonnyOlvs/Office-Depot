@@ -1,0 +1,21 @@
+{
+  "name": "regresion-playwright",
+  "version": "1.0.0",
+  "description": "Pruebas de regresión con Playwright + TypeScript",
+  "scripts": {
+    "test": "playwright test",
+    "test:visual": "playwright test tests/visual",
+    "test:percy": "percy exec -- npm run test:visual",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@percy/cli": "^1.31.11",
+    "@percy/playwright": "^1.1.0",
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

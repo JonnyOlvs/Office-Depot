@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build / output
+dist/
+output/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Playwright
+/blob-report/
+/playwright-report/
+/test-results/
+
+# Percy
+.percy-cache/
