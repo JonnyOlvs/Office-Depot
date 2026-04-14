@@ -5,6 +5,8 @@
   "scripts": {
     "test": "playwright test",
     "test:visual": "playwright test tests/visual",
+    "test:visual:usuarios": "percy exec -- playwright test tests/visual/usuarios-login.visual.spec.ts",
+    "test:visual:ordenes": "percy exec -- playwright test tests/visual/ordenes-compra.visual.spec.ts",
     "test:percy": "percy exec -- npm run test:visual",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",

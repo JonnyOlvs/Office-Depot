@@ -124,6 +124,88 @@ export class Ordenes {
     await this.delay(2000);
   }
 
+  private async pasoBusquedaSkuEnter(sku: string): Promise<void> {
+    await assertNoMantenimiento(this.page);
+    const inputBusqueda = this.page.locator(this.fields.inputArticulo);
+    await inputBusqueda.click();
+    await inputBusqueda.clear();
+    await inputBusqueda.pressSequentially(sku, { delay: 50 });
+    await this.delay(800);
+    await this.page.keyboard.press('Enter');
+    await this.delay(3000);
+  }
+
+  private async pasoProductoCantidadYEnvio(
+    cantidad: string,
+    tipoEnvio: 'domicilio' | 'express' | 'tienda',
+  ): Promise<void> {
+    await this.page.locator(this.fields.objectProductoBusqueda).click();
+    await this.delay(3000);
+    await this.selectCantidad(cantidad);
+    const botonEnvio =
+      tipoEnvio === 'domicilio'
+        ? this.fields.buttonEnvioDomicilio
+        : tipoEnvio === 'express'
+          ? this.fields.buttonEnvioExpress
+          : this.fields.buttonEnvioTienda;
+    const locatorEnvio = this.page.locator(botonEnvio);
+    await locatorEnvio.waitFor({ state: 'visible', timeout: 10000 });
+    await this.delay(300);
+    await locatorEnvio.click();
+  }
+
+  private async pasoAnadirCarritoYGarantia(): Promise<void> {
+    await this.page.locator(this.fields.buttonAnadirCarrito).click();
+    await this.delay(2000);
+    const hayGarantia = await this.existeElemento(this.fields.buttonGarantia);
+    if (hayGarantia) {
+      await this.page.locator(this.fields.buttonGarantia).click();
+    }
+  }
+
+  private async pasoCarritoYFinalizarPedido(): Promise<void> {
+    await this.page.locator(this.fields.buttonCarrito).click();
+    await this.page.locator(this.fields.buttonFinalizarPedido).click();
+    await this.delay(2000);
+  }
+
+  private async pasoRadioPaypalYClickPagar(): Promise<void> {
+    await this.page.locator(this.fields.radioButtonPaypal).click();
+    await this.page.locator(this.fields.buttonPagarPaypal).click();
+  }
+
+  private async pasoPaypalLoginYFinalizarCompra(): Promise<void> {
+    const paypalEmail = 'angelica.concepcion@officedepot.com.mx';
+    const paypalPassword = 'PONCHIS26';
+    await this.page.locator(this.fields.inputCorreoPaypal).fill(paypalEmail);
+    await this.page.locator(this.fields.buttonSiguiente).click();
+    await this.page.locator(this.fields.inputPSWPaypal).fill(paypalPassword);
+    await this.page.locator(this.fields.buttonIniciarSesionPaypal).click();
+    await this.page.locator(this.fields.buttonContinuarPedido).click();
+    await this.delay(5000);
+    await this.page.locator(this.fields.buttonFinalizarCompra).click();
+    await this.page.locator(this.fields.buttonSeguirBusando).click();
+  }
+
+  private async pasoMisPedidosDesdeHeader(): Promise<void> {
+    await this.page.locator(this.fields.buttonMiCuenta).click();
+    await this.page.locator(this.fields.buttonMisPedidos).click();
+  }
+
+  private async pasoLeerNumeroOrdenConReintentos(): Promise<string> {
+    let ordenNumero = '';
+    for (let intento = 1; intento <= 5; intento++) {
+      ordenNumero = (await this.page.locator(this.fields.labelOrden).innerText()).trim();
+      if (ordenNumero) break;
+      await this.delay(3000);
+      await this.page.reload({ waitUntil: 'load' });
+      await this.delay(3000);
+      await this.page.locator(this.fields.buttonMiCuenta).click();
+      await this.page.locator(this.fields.buttonMisPedidos).click();
+    }
+    return ordenNumero;
+  }
+
   /**
    * Flujo completo para generar una orden: búsqueda por SKU, añadir al carrito, checkout con PayPal, obtener número de orden.
    * Requiere que la página esté cargada y el usuario ya logueado.
@@ -137,76 +219,14 @@ export class Ordenes {
     foraneo?: boolean;
   }): Promise<string> {
     const { sku, cantidad, tipoEnvio, foraneo = false } = datosFila;
-    await assertNoMantenimiento(this.page);
-
-    // Búsqueda por SKU: tecleo real con pressSequentially y Enter
-    const inputBusqueda = this.page.locator(this.fields.inputArticulo);
-    await inputBusqueda.click();
-    await inputBusqueda.clear();
-    await inputBusqueda.pressSequentially(sku, { delay: 50 });
-    await this.delay(800);
-    await this.page.keyboard.press('Enter');
-    await this.delay(3000);
-
-    // Producto y cantidad
-    await this.page.locator(this.fields.objectProductoBusqueda).click();
-    await this.delay(3000);
-    await this.selectCantidad(cantidad);
-
-    const botonEnvio =
-      tipoEnvio === 'domicilio'
-        ? this.fields.buttonEnvioDomicilio
-        : tipoEnvio === 'express'
-          ? this.fields.buttonEnvioExpress
-          : this.fields.buttonEnvioTienda;
-    const locatorEnvio = this.page.locator(botonEnvio);
-    await locatorEnvio.waitFor({ state: 'visible', timeout: 10000 });
-    await this.delay(300);
-    await locatorEnvio.click();
-
-    // Añadir al carrito
-    await this.page.locator(this.fields.buttonAnadirCarrito).click();
-    await this.delay(2000);
-
-    const hayGarantia = await this.existeElemento(this.fields.buttonGarantia);
-    if (hayGarantia) {
-      await this.page.locator(this.fields.buttonGarantia).click();
-    }
-
-    // Checkout 
-    await this.page.locator(this.fields.buttonCarrito).click();
-    await this.page.locator(this.fields.buttonFinalizarPedido).click();
+    await this.pasoBusquedaSkuEnter(sku);
+    await this.pasoProductoCantidadYEnvio(cantidad, tipoEnvio);
+    await this.pasoAnadirCarritoYGarantia();
+    await this.pasoCarritoYFinalizarPedido();
     await this.seleccionarDireccionEnCheckout(foraneo);
-    await this.page.locator(this.fields.radioButtonPaypal).click();
-    await this.page.locator(this.fields.buttonPagarPaypal).click();
-
-    // Paypal credentials pasar a variables de entorno
-    const paypalEmail = 'angelica.concepcion@officedepot.com.mx';
-    const paypalPassword = 'PONCHIS26';
-
-    await this.page.locator(this.fields.inputCorreoPaypal).fill(paypalEmail);
-    await this.page.locator(this.fields.buttonSiguiente).click();
-    await this.page.locator(this.fields.inputPSWPaypal).fill(paypalPassword);
-    await this.page.locator(this.fields.buttonIniciarSesionPaypal).click();
-    await this.page.locator(this.fields.buttonContinuarPedido).click();
-    await this.delay(5000);
-    await this.page.locator(this.fields.buttonFinalizarCompra).click();
-    await this.page.locator(this.fields.buttonSeguirBusando).click();
-    await this.page.locator(this.fields.buttonMiCuenta).click();
-    await this.page.locator(this.fields.buttonMisPedidos).click();
-
-    // Obtener número de orden con reintentos
-    let ordenNumero = '';
-    for (let intento = 1; intento <= 5; intento++) {
-      ordenNumero = (await this.page.locator(this.fields.labelOrden).innerText()).trim();
-      if (ordenNumero) break;
-      await this.delay(3000);
-      await this.page.reload({ waitUntil: 'load' });
-      await this.delay(3000);
-      await this.page.locator(this.fields.buttonMiCuenta).click();
-      await this.page.locator(this.fields.buttonMisPedidos).click();
-    }
-
-    return ordenNumero;
+    await this.pasoRadioPaypalYClickPagar();
+    await this.pasoPaypalLoginYFinalizarCompra();
+    await this.pasoMisPedidosDesdeHeader();
+    return await this.pasoLeerNumeroOrdenConReintentos();
   }
 }
