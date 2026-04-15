@@ -88,6 +88,16 @@ export class UsuariosLogin {
   }
 
   /**
+   * Home ya logueado: el primer `imgLogo` en XPath a veces está en DOM pero Playwright lo marca `hidden` (móvil, duplicados).
+   * La cabecera «Mi cuenta» sí suele ser visible y equivale a sesión iniciada.
+   */
+  private async esperarHomeConSesionIniciada(): Promise<void> {
+    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.locator(this.fields.buttonMiCuenta).waitFor({ state: 'visible', timeout: 60000 });
+    await expect(this.page.locator(this.fields.buttonMiCuenta)).toBeVisible();
+  }
+
+  /**
    * Login con user y password (p. ej. desde getLoginCredentialsFromInputRegresion() o fila del CSV).
    */
   async login(user: string, password: string): Promise<void> {
@@ -145,8 +155,7 @@ export class UsuariosLogin {
     await this.page.waitForSelector(this.fields.buttonCrearCuentaRegistro);
     await this.page.locator(this.fields.buttonCrearCuentaRegistro).click();
 
-    await this.page.waitForSelector(this.fields.imgLogo);
-    await expect(this.page.locator(this.fields.imgLogo)).toBeVisible();
+    await this.esperarHomeConSesionIniciada();
   }
 
   /** Contraseña nueva usada al restablecer (TC_UYL_004). */
@@ -154,8 +163,8 @@ export class UsuariosLogin {
 
   /**
    * TC_UYL_004 — Restablecer password Web.
-   * Mismo flujo de registro que TC_UYL_001; tras validar imgLogo: Mi Cuenta → Contraseña,
-   * cambia contraseña (actual → 87654321), valida mensaje, sale, inicia sesión con correo + nueva contraseña y valida imgLogo.
+   * Mismo flujo de registro que TC_UYL_001; tras validar sesión (Mi cuenta): Mi Cuenta → Contraseña,
+   * cambia contraseña (actual → 87654321), valida mensaje, sale, inicia sesión con correo + nueva contraseña y valida sesión en home.
    */
   async restablecerPasswordWeb(): Promise<void> {
     await this.page.goto('/');
@@ -194,11 +203,9 @@ export class UsuariosLogin {
     await this.page.waitForSelector(this.fields.buttonCrearCuentaRegistro);
     await this.page.locator(this.fields.buttonCrearCuentaRegistro).click();
 
-    await this.page.waitForSelector(this.fields.imgLogo);
-    await expect(this.page.locator(this.fields.imgLogo)).toBeVisible();
+    await this.esperarHomeConSesionIniciada();
 
     // Mi Cuenta → Contraseña
-    await this.page.locator(this.fields.buttonMiCuenta).waitFor({ state: 'visible', timeout: 15000 });
     await this.page.locator(this.fields.buttonMiCuenta).click();
     await this.page.locator(this.fields.buttonContrasena).waitFor({ state: 'visible', timeout: 10000 });
     await this.page.locator(this.fields.buttonContrasena).click();
@@ -236,8 +243,7 @@ export class UsuariosLogin {
     await this.page.locator(this.fields.inputContrasena).fill(this.NUEVA_CONTRASENA_RESTABLECER);
     await this.page.locator(this.fields.buttonIniciarSesion).click();
 
-    await this.page.locator(this.fields.imgLogo).waitFor({ state: 'visible', timeout: 15000 });
-    await expect(this.page.locator(this.fields.imgLogo)).toBeVisible();
+    await this.esperarHomeConSesionIniciada();
   }
 
   /**
