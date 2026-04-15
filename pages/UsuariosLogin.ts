@@ -97,6 +97,51 @@ export class UsuariosLogin {
     await expect(this.page.locator(this.fields.buttonMiCuenta)).toBeVisible();
   }
 
+  /** Desktop: span XPath; móvil/drawer: enlace o texto «Contraseña». */
+  private async clickMenuItemContraseña(): Promise<void> {
+    await this.delay(800);
+    const legacy = this.page.locator(this.fields.buttonContrasena);
+    if (await legacy.isVisible().catch(() => false)) {
+      await legacy.click();
+      return;
+    }
+    const link = this.page.getByRole('link', { name: 'Contraseña' });
+    if ((await link.count()) > 0 && (await link.first().isVisible().catch(() => false))) {
+      await link.first().click();
+      return;
+    }
+    const candidates = this.page.getByText('Contraseña', { exact: true });
+    const n = await candidates.count();
+    for (let i = 0; i < n; i++) {
+      const c = candidates.nth(i);
+      if (await c.isVisible().catch(() => false)) {
+        await c.click();
+        return;
+      }
+    }
+    throw new Error('No se encontró «Contraseña» visible en el menú Mi cuenta.');
+  }
+
+  /** Desktop: span Salir; menú móvil: mismo texto. */
+  private async clickMenuItemSalir(): Promise<void> {
+    await this.delay(500);
+    const legacy = this.page.locator(this.fields.buttonSalir);
+    if (await legacy.isVisible().catch(() => false)) {
+      await legacy.click();
+      return;
+    }
+    const candidates = this.page.getByText('Salir', { exact: true });
+    const n = await candidates.count();
+    for (let i = 0; i < n; i++) {
+      const c = candidates.nth(i);
+      if (await c.isVisible().catch(() => false)) {
+        await c.click();
+        return;
+      }
+    }
+    throw new Error('No se encontró «Salir» visible en el menú Mi cuenta.');
+  }
+
   /**
    * Login con user y password (p. ej. desde getLoginCredentialsFromInputRegresion() o fila del CSV).
    */
@@ -207,8 +252,7 @@ export class UsuariosLogin {
 
     // Mi Cuenta → Contraseña
     await this.page.locator(this.fields.buttonMiCuenta).click();
-    await this.page.locator(this.fields.buttonContrasena).waitFor({ state: 'visible', timeout: 10000 });
-    await this.page.locator(this.fields.buttonContrasena).click();
+    await this.clickMenuItemContraseña();
 
     await this.page.locator(this.fields.inputContrasenaActual).waitFor({ state: 'visible', timeout: 10000 });
     const inputContrasenaActual = this.page.locator(this.fields.inputContrasenaActual);
@@ -233,8 +277,7 @@ export class UsuariosLogin {
 
     // Salir y volver a entrar con la nueva contraseña
     await this.page.locator(this.fields.buttonMiCuenta).click();
-    await this.page.locator(this.fields.buttonSalir).waitFor({ state: 'visible', timeout: 10000 });
-    await this.page.locator(this.fields.buttonSalir).click();
+    await this.clickMenuItemSalir();
 
     await this.page.locator(this.fields.buttonIniciaSesion).waitFor({ state: 'visible', timeout: 10000 });
     await this.page.locator(this.fields.buttonIniciaSesion).click();

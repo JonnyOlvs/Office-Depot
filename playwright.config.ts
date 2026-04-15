@@ -12,7 +12,8 @@ export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  /** Solo reintenta el test que falló (1 vez en CI). */
+  retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : 1,
   reporter: [
     ['html', { open: 'never', outputFolder: 'playwright-report' }],
@@ -21,7 +22,11 @@ export default defineConfig({
   use: {
     baseURL: process.env.BASE_URL || 'https://ecqa.officedepot.com.mx',
     headless: process.env.CI === 'true' || process.env.HEADLESS === 'true',
-    viewport: null,
+    /** En CI `null` suele verse como móvil; tamaño fijo evita layout drawer. */
+    viewport:
+      process.env.CI === 'true' || process.env.HEADLESS === 'true'
+        ? { width: 1920, height: 1080 }
+        : null,
     actionTimeout: 60 * 1000,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
@@ -32,9 +37,15 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...desktopChrome,
-        viewport: null,
+        viewport:
+          process.env.CI === 'true' || process.env.HEADLESS === 'true'
+            ? { width: 1920, height: 1080 }
+            : null,
         launchOptions: {
-          args: ['--start-maximized'],
+          args:
+            process.env.CI === 'true' || process.env.HEADLESS === 'true'
+              ? []
+              : ['--start-maximized'],
         },
       },
     },

@@ -16,8 +16,10 @@ import { UsuariosLogin } from '../pages/UsuariosLogin';
  *
  * Ejecutar: npx playwright test UsuariosLogin.spec.ts
  * Un TC:    npx playwright test UsuariosLogin.spec.ts -g "@TC_UYL_003"
+ *
+ * Los TC son independientes (sin describe.serial): un fallo no cancela los demás; el reintento solo aplica al test fallido (ver retries en playwright.config).
  */
-test.describe.serial('@mod_usuarios_login Usuarios y Login', () => {
+test.describe('@mod_usuarios_login Usuarios y Login', () => {
   test('@TC_UYL_001 Usuario General Crear Cuenta desde Login', async ({ page }) => {
     const usuariosLogin = new UsuariosLogin(page);
     await usuariosLogin.crearCuentaDesdeLogin();
