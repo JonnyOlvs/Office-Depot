@@ -1,18 +1,18 @@
-name: regresionOffice
+name: UsuariosLogin
 
 on:
   workflow_dispatch:
   schedule:
-    # Lunes 08:00 Ciudad de México (horario estándar UTC-6) → 14:00 UTC. En horario de verano (UTC-5) serían las 09:00 locales; ajusta la hora UTC si lo necesitas.
+    # Lunes ~08:00 Ciudad de México (UTC-6) → 14:00 UTC
     - cron: '0 14 * * 1'
 
 concurrency:
-  group: regresion-office-${{ github.workflow }}-${{ github.ref }}
+  group: usuarios-login-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  regression:
-    name: Playwright y Percy
+  usuarios-login:
+    name: Playwright — Usuarios y Login
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -37,17 +37,17 @@ jobs:
       - name: Instalar navegadores Playwright
         run: npx playwright install --with-deps chromium
 
-      - name: Pruebas de regresión (sin @visual)
-        run: npx playwright test --grep-invert "@visual"
+      - name: Pruebas — tests/UsuariosLogin.spec.ts
+        run: npx playwright test tests/UsuariosLogin.spec.ts
 
-      - name: Percy — snapshots visuales
+      - name: Percy — tests/visual/usuarios-login.visual.spec.ts
         if: ${{ env.PERCY_TOKEN != '' }}
-        run: npx percy exec -- npm run test:visual
+        run: npx percy exec -- npx playwright test tests/visual/usuarios-login.visual.spec.ts
 
       - name: Subir reporte Playwright
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-usuarios-login
           path: playwright-report/
           retention-days: 7
