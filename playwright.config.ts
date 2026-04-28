@@ -17,6 +17,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : 1,
   reporter: [
     ['html', { open: 'never', outputFolder: 'playwright-report' }],
+    ['allure-playwright', { outputFolder: 'allure-results', detail: true }],
     ['list'],
   ],
   use: {
@@ -28,7 +29,7 @@ export default defineConfig({
         ? { width: 1920, height: 1080 }
         : null,
     actionTimeout: 60 * 1000,
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },

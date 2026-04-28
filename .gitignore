@@ -6,6 +6,8 @@ dist/
 output/
 test-results/
 playwright-report/
+allure-results/
+allure-report/
 playwright/.cache/
 
 # Environment
@@ -31,6 +33,8 @@ npm-debug.log*
 /blob-report/
 /playwright-report/
 /test-results/
+/allure-results/
+/allure-report/
 
 # Percy
 .percy-cache/

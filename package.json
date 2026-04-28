@@ -11,13 +11,18 @@
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "allure:generate": "allure generate allure-results --clean -o allure-report",
+    "allure:open": "allure open allure-report",
+    "allure:serve": "allure serve allure-results"
   },
   "devDependencies": {
     "@percy/cli": "^1.31.11",
     "@percy/playwright": "^1.1.0",
-    "@playwright/test": "^1.49.0",
+    "@playwright/test": "^1.59.1",
     "@types/node": "^22.10.0",
+    "allure-commandline": "^2.38.1",
+    "allure-playwright": "^3.7.1",
     "typescript": "^5.7.0"
   }
 }

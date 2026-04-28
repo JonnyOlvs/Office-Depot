@@ -23,12 +23,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: Instalar dependencias
@@ -41,13 +41,47 @@ jobs:
         run: npx playwright test tests/UsuariosLogin.spec.ts
 
       - name: Percy — tests/visual/usuarios-login.visual.spec.ts
-        if: ${{ env.PERCY_TOKEN != '' }}
+        if: ${{ always() && env.PERCY_TOKEN != '' }}
         run: npx percy exec -- npx playwright test tests/visual/usuarios-login.visual.spec.ts
 
+      - name: Generar reporte Allure
+        if: ${{ always() }}
+        run: |
+          if [ -d allure-results ] && [ "$(ls -A allure-results)" ]; then
+            npm run allure:generate
+          else
+            mkdir -p allure-report
+            printf '%s\n' '<html><body><h1>Sin resultados de Allure</h1><p>No se generaron archivos en allure-results.</p></body></html>' > allure-report/index.html
+          fi
+
       - name: Subir reporte Playwright
-        if: failure()
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-usuarios-login
           path: playwright-report/
+          retention-days: 7
+
+      - name: Subir resultados Playwright
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-usuarios-login
+          path: test-results/
+          retention-days: 7
+
+      - name: Subir resultados Allure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-usuarios-login
+          path: allure-results/
+          retention-days: 7
+
+      - name: Subir reporte Allure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-usuarios-login
+          path: allure-report/
           retention-days: 7
