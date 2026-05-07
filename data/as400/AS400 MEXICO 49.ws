@@ -28,7 +28,7 @@ Language=Latin-America(Spanish)
 IBMDefaultKeyboard=N
 DefaultKeyboard=C:\Users\Jonathan Olivos\Documents\IBM\as400_mejorado.kmp
 [LastExitView]
-A=4 2393 117 896 492 3 13 29 400 0 IBM3270— 284
+A=3 1998 78 896 492 3 11 14 400 0 IBM3270— 284
 [Window]
 ViewFlags=CE00
 RuleLinePos=0 0

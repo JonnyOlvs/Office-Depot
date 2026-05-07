@@ -494,7 +494,7 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
             log_warn(f"⚠ [TN5250] No se pudo leer pantalla: {e}")
             return ""
 
-    def t_debug_log_screen(label: str, max_lines: int = 8):
+    def t_debug_log_screen(label: str, max_lines: int = 27):
         """
         Log auxiliar para entender exactamente qué texto devuelve getScreen()
         en ciertos puntos (por ejemplo justo después de login).
@@ -504,7 +504,8 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
             log_warn(f"🔎 [TN5250] {label}: pantalla vacía o no legible.")
             return
         lines = raw.splitlines()
-        snippet = "\n".join(lines[:max_lines])
+        # max_lines controla cuántas filas mostramos; por defecto, la pantalla completa (27 filas típicas).
+        snippet = "\n".join(lines[:max_lines]) if max_lines else raw
         log(
             f"🔎 [TN5250] {label} - primeras {min(max_lines, len(lines))} lineas de pantalla:\n"
             f"{snippet}"
