@@ -9,6 +9,7 @@ export class Ordenes {
   /** Selectores web para el flujo de órdenes (búsqueda, carrito, checkout, PayPal). */
   private readonly fields = {
     inputArticulo: "input[id='js-site-search-input']",
+    listCoincidencias: "//div[contains(text(),'Caja de Gises Blancos Vinci 150 piezas')]",
     buttonHomeCP: "div[id='changeCPHeader']",
     radioButtonCPLocal: "(//input[@id=//label[contains(.,'14100')]/@for])[2]",
     radioButtonCPForaneo: "(//input[@id=//label[contains(.,'64000')]/@for])[2]",
@@ -89,7 +90,7 @@ export class Ordenes {
     await this.delay(500);
     await this.page.locator(this.fields.buttonContinuarDirecciones).click();
     await this.delay(1000);
-    //await this.page.locator(this.fields.buttonContinuarPago).click();
+    await this.page.locator(this.fields.buttonContinuarPago).click();
     await this.delay(1000);
   }
 
@@ -104,7 +105,13 @@ export class Ordenes {
     await inputBusqueda.clear();
     await inputBusqueda.pressSequentially(sku, { delay: 50 });
     await this.delay(800);
-    await this.page.keyboard.press('Enter');
+    // Búsqueda original con Enter (temporalmente deshabilitada):
+    // await this.page.keyboard.press('Enter');
+    // await this.delay(3000);
+    // Nuevo flujo temporal: esperar coincidencias y seleccionar la primera opción de la lista
+    const coincidencia = this.page.locator(this.fields.listCoincidencias).first();
+    await coincidencia.waitFor({ state: 'visible', timeout: 8000 });
+    await coincidencia.click();
     await this.delay(3000);
     await this.page.locator(this.fields.objectProductoBusqueda).click();
     await this.delay(3000);
@@ -131,7 +138,13 @@ export class Ordenes {
     await inputBusqueda.clear();
     await inputBusqueda.pressSequentially(sku, { delay: 50 });
     await this.delay(800);
-    await this.page.keyboard.press('Enter');
+    // Búsqueda original con Enter (temporalmente deshabilitada):
+    // await this.page.keyboard.press('Enter');
+    // await this.delay(3000);
+    // Nuevo flujo temporal: esperar coincidencias y seleccionar la primera opción de la lista
+    const coincidencia = this.page.locator(this.fields.listCoincidencias).first();
+    await coincidencia.waitFor({ state: 'visible', timeout: 8000 });
+    await coincidencia.click();
     await this.delay(3000);
   }
 
@@ -139,7 +152,7 @@ export class Ordenes {
     cantidad: string,
     tipoEnvio: 'domicilio' | 'express' | 'tienda',
   ): Promise<void> {
-    await this.page.locator(this.fields.objectProductoBusqueda).click();
+    //await this.page.locator(this.fields.objectProductoBusqueda).click();
     await this.delay(3000);
     await this.selectCantidad(cantidad);
     const botonEnvio =
@@ -175,8 +188,10 @@ export class Ordenes {
   }
 
   private async pasoPaypalLoginYFinalizarCompra(): Promise<void> {
-    const paypalEmail = 'angelica.concepcion@officedepot.com.mx';
-    const paypalPassword = 'PONCHIS26';
+    //const paypalEmail = 'angelica.concepcion@officedepot.com.mx';
+    //const paypalPassword = 'PONCHIS26';
+    const paypalEmail = 'compraspetco@gmail.com';
+    const paypalPassword = '123456789';
     await this.page.locator(this.fields.inputCorreoPaypal).fill(paypalEmail);
     await this.page.locator(this.fields.buttonSiguiente).click();
     await this.page.locator(this.fields.inputPSWPaypal).fill(paypalPassword);
