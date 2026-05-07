@@ -663,14 +663,15 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
         # Log de depuración: cómo se ve la pantalla ANTES de intentar login
         t_debug_log_screen("Pantalla antes de login (TN5250)")
 
-        # Login simple
+        # Login simple (sin TAB explícito; asumimos que el host mueve el cursor
+        # al campo de contraseña después de escribir el usuario, tal como hace el emulador UI).
         log("🔐 [TN5250] Ejecutando login...")
         t_wait(3.0)
         t_write(USER)
         t_wait(0.4)
-        t_tabs(1)
-        t_wait(0.3)
+        t_debug_log_screen("Pantalla TN5250 después de escribir USER")
         t_write(PASS)
+        t_debug_log_screen("Pantalla TN5250 después de escribir PASS")
         t_enter(2, delay_between=1.5)
         log("✅ [TN5250] Login completado.")
 
