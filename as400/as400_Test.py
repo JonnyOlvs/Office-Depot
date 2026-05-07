@@ -477,22 +477,7 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
         # Damos un pequeño tiempo para que la primera pantalla esté lista
         t_wait(DELAY_BEFORE_TYPE)
 
-        # Login doble (si aplica)
-        if login_times == 2:
-            log("🔐 [TN5250] Ejecutando primer login...")
-            t_tabs(3)
-            t_write(USER)
-            t_tabs(1)
-            t_wait(0.4)
-            t_write(PASS)
-            t_backspace(1)
-            t_wait(0.4)
-            t_tabs(1)
-            t_enter(1, delay_between=1.5)
-            t_wait(2.0)
-            log("✅ [TN5250] Primer login completado.")
-
-        # Login simple (único o segundo)
+        # Login simple
         log("🔐 [TN5250] Ejecutando login...")
         t_wait(3.0)
         t_write(USER)
@@ -572,23 +557,7 @@ def run_job_ui(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times: in
 
     time.sleep(DELAY_BEFORE_TYPE)
 
-    # Login
-    if login_times == 2:
-        # Login doble (primera vez)
-        log("🔐 Ejecutando primer login (UI)...")
-        tabs(3)
-        write(USER)
-        tabs(1)
-        wait(0.4)
-        write(PASS)
-        backspace(1)
-        wait(0.4)
-        tabs(1)
-        enter(1, delay_between=1.5)
-        wait(2.0)
-        log("✅ Primer login completado (UI).")
-
-    # Login simple (único o segundo)
+    # Login simple
     log("🔐 Ejecutando login (UI)...")
     wait(3.0)
     write(USER)
@@ -992,7 +961,7 @@ def web_flow(USER: str, PSW: str, SKU: str, CANTIDAD: str):
 
 
 # ====================================================
-# =============== MAIN / SELECCIÓN DE FLUJO ==========
+# =============== MAIN / FLUJO PRINCIPAL =============
 # ====================================================
 if __name__ == "__main__":
     log(f"🟢 Script iniciado. Carpeta de datos AS400: {DATA_AS400_DIR}")
@@ -1001,36 +970,24 @@ if __name__ == "__main__":
     log(f"INPUT_ORDENES:  {INPUT_ORDENES}")
     log(f"LOG_PATH:       {LOG_PATH}")
 
-    print("======================================")
-    print("   Selecciona flujo de ejecución")
-    print("======================================")
-    print("1) Facturar")
-    print("2) Generar Ordenes")
-    opcion = input("Opción [1/2]: ").strip()
+    # Modo no interactivo (CI / GitHub Actions)
+    ci_flag = (os.getenv("GITHUB_ACTIONS", "").lower() == "true") or (
+        os.getenv("CI", "").lower() == "true"
+    ) or (os.getenv("AS400_NON_INTERACTIVE", "").lower() == "true")
 
-    if opcion == "1":
-        log("▶ Modo seleccionado: Facturacion.")
-        
-        print("\n======================================")
-        print("   Tipo de login")
-        print("======================================")
-        print("1) Login simple (1 vez)")
-        print("2) Login doble (2 veces)")
-        login_opcion = input("Tipo de login [1/2]: ").strip()
-        
-        if login_opcion == "2":
-            login_times = 2
-            log("▶ Tipo de login: Doble (2 veces)")
-        else:
-            login_times = 1
-            log("▶ Tipo de login: Simple (1 vez)")
-        
+    if ci_flag:
+        # En CI siempre usamos login simple (1 vez)
+        login_times = 1
+        log("▶ Modo no interactivo (CI): Login simple (1 vez)")
         process_csv(INPUT_CSV, login_times)
 
-    elif opcion == "2":
-        log("▶ Modo seleccionado: Generar Ordenes")
-        process_ordenes_csv(INPUT_ORDENES)
-
     else:
-        log_err(f"Opción no válida: '{opcion}'. Saliendo.")
+        # Modo interactivo local: siempre login simple (1 vez)
+        print("======================================")
+        print("   Facturación AS400")
+        print("======================================")
+        print("Login simple (1 vez)")
+        login_times = 1
+        log("▶ Tipo de login: Simple (1 vez)")
+        process_csv(INPUT_CSV, login_times)
 
