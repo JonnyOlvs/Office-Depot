@@ -475,6 +475,25 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
                 return name
         return "UNKNOWN"
 
+    def t_check_invalid_order_status(order: str):
+        """
+        Lee la pantalla actual y detecta si aparece el mensaje
+        'estatus de la orden inválido'. Si lo encuentra, lanza
+        una excepción para que el flujo de CI marque la fila
+        como fallida.
+        """
+        try:
+            raw = client.getScreen() or ""
+        except Exception as e:
+            log_warn(f"⚠ [TN5250] No se pudo leer pantalla para validar estatus de orden: {e}")
+            return
+
+        tlow = raw.lower()
+        # Buscamos una subcadena robusta sin depender del acento exacto
+        if "estatus de la orden inval" in tlow:
+            log_err(f"❌ [TN5250] Estatus de la orden inválido para orden '{order}'.")
+            raise RuntimeError(f"Estatus de la orden inválido para orden '{order}'")
+
     try:
         # Damos un pequeño tiempo para que la primera pantalla esté lista
         t_wait(DELAY_BEFORE_TYPE)
@@ -519,6 +538,8 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
         t_write(ORDER)
         t_enter(1, delay_between=1.5)
         t_wait(2.0)
+        # Validar mensaje de estatus de orden antes de continuar
+        t_check_invalid_order_status(ORDER or "")
         t_press_key("F7")
         t_wait(20.0)
 
@@ -647,7 +668,10 @@ def process_csv(csv_path: str, login_times: int = 1):
             ORDER = getcol(row, "order", "orden", "Order", "Orden").strip()
             LOCA  = getcol(row, "localidad", "loc", "Localidad").strip()
 
+            # Saltar filas vacías o de ejemplo/comentario
             if not any([USER, PASS, ORDER, LOCA]):
+                continue
+            if USER.startswith("#") or ORDER.startswith("#"):
                 continue
 
             row_count += 1
@@ -668,6 +692,18 @@ def process_csv(csv_path: str, login_times: int = 1):
         log("\n" + "="*60)
         log(f"Resumen: procesadas={row_count} | OK={ok_count} | Fallas={fail_count}")
         log("="*60)
+
+        # En modo CI queremos que el proceso falle si hubo al menos una fila fallida,
+        # para que GitHub Actions marque el job en rojo.
+        if fail_count > 0 and (
+            os.getenv("GITHUB_ACTIONS", "").lower() == "true"
+            or os.getenv("CI", "").lower() == "true"
+            or os.getenv("AS400_NON_INTERACTIVE", "").lower() == "true"
+        ):
+            raise RuntimeError(
+                f"Se encontraron {fail_count} fila(s) fallida(s) en AS400. "
+                "Revisa el log para más detalles (mensajes como 'Estatus de la orden inválido')."
+            )
 
 # ====================================================
 # =============== FLUJO CSV PARA ÓRDENES WEB =========
