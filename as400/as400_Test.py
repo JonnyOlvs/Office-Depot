@@ -9,7 +9,9 @@ USE_TN5250 = AS400_TRANSPORT == "TN5250"
 # Parámetros TN5250 (se configuran vía variables de entorno en CI)
 TN5250_HOST = os.getenv("AS400_HOST", "").strip()           # ej. "mi-as400.empresa.com"
 TN5250_PORT = os.getenv("AS400_PORT", "").strip() or "23"   # por defecto telnet 23
-TN5250_CODEPAGE = os.getenv("AS400_CODEPAGE", "cp1252")
+# En TN5250 debemos usar una code page EBCDIC válida.
+# Para HostCodePage=284-L en el .WS corresponde "cp284" (spanish, Latin América).
+TN5250_CODEPAGE = os.getenv("AS400_CODEPAGE", "cp284").strip() or "cp284"
 TN5250_S3270_PATH = os.getenv("S3270_PATH", "").strip() or None  # ruta opcional a s3270 / wc3270
 
 # Importaciones específicas de Windows solo si usamos emulador con UI

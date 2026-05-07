@@ -10,7 +10,8 @@ jobs:
       AS400_TRANSPORT: TN5250
       AS400_HOST: ${{ secrets.AS400_HOST }}
       AS400_PORT: "23"
-      AS400_CODEPAGE: "cp1252"
+      # HostCodePage=284-L en el .WS → usar cp284 (spanish / Latin América)
+      AS400_CODEPAGE: "cp284"
 
     steps:
       - name: Checkout
