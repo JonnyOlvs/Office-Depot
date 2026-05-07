@@ -104,8 +104,9 @@ SCREENS = {
     ],
 }
 
-# Texto genérico de error de estatus de orden
-ORDER_STATUS_INVALID_TEXT = "estatus de la orden inválido"
+# Texto genérico de error de estatus de orden (subcadena laxa para cubrir
+# variantes con/sin acento: "estatus de la orden invalido/ inválido", etc.)
+ORDER_STATUS_INVALID_SUBSTR = "estatus de la orden inval"
 
 # ====================================================
 # =============== SECCIÓN AS400 / VENTANAS (UI) ======
@@ -541,9 +542,11 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
     def t_check_invalid_order_status(order: str):
         """
         Lee la pantalla actual y detecta si aparece el mensaje
-        'estatus de la orden inválido'. Si lo encuentra, lanza
+        de estatus de orden inválido. Si lo encuentra, lanza
         una excepción para que el flujo de CI marque la fila
         como fallida.
+        Además, loguea un snippet de la pantalla en cada intento
+        para poder ajustar la firma si cambia el texto.
         """
         for intento in range(3):
             try:
@@ -555,7 +558,17 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
                 )
                 raw = ""
 
-            if ORDER_STATUS_INVALID_TEXT in (raw or "").lower():
+            # Logueamos las primeras líneas para depurar el texto real
+            if raw:
+                lines = (raw or "").splitlines()
+                snippet = "\n".join(lines[:6])
+                log(
+                    f"🔎 [TN5250] Pantalla al validar estatus de orden "
+                    f"(orden='{order}', intento {intento+1}):\n{snippet}"
+                )
+
+            tlow = (raw or "").lower()
+            if ORDER_STATUS_INVALID_SUBSTR in tlow:
                 log_err(
                     f"❌ [TN5250] Estatus de la orden inválido para orden '{order}' "
                     f"(intento {intento+1})."
@@ -686,40 +699,52 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
             # Ya no estamos en pantallas intermedias; continuamos flujo normal
             break
 
+        # Log de contexto antes de empezar el flujo de negocio
+        t_debug_log_screen("Pantalla lista para flujo de negocio (después de login/normalización)")
+
         # Cambio de Localidad
         t_wait(2.0)
         t_tabs(1)
         t_write("MENOP1")
         t_enter(1, delay_between=1.5)
+        t_debug_log_screen("Pantalla después de MENOP1")
 
         t_write("27")
         t_enter(1, delay_between=1.5)
+        t_debug_log_screen("Pantalla después de opción 27 (menú cambio de localidad)")
+
         t_write("MUD001")
         t_tabs(4)
 
         loc = (LOCALIDAD or "").strip() or DEFAULT_LOCALIDAD
         t_write(f"'{loc}'")
         t_enter(1, delay_between=1.5)
+        t_debug_log_screen(f"Pantalla después de MUD001/localidad (loc='{loc}')")
 
         # Facturación
         t_tabs(1)
         t_write("MENFAC")
         t_enter(1, delay_between=1.5)
+        t_debug_log_screen("Pantalla después de MENFAC (antes de validar FACT_MENU)")
         # Validar menú principal de facturación
         t_expect_screen("FACT_MENU", "después de MENFAC (menú principal de Facturación)")
 
         t_write("5")
         t_enter(1, delay_between=1.5)
+        t_debug_log_screen("Pantalla después de opción 5 (antes de validar FACT_BY_ORDER)")
         # Validar pantalla 'Facturación Por Número de Orden'
         t_expect_screen("FACT_BY_ORDER", "después de opción 5 (Facturación por número de orden)")
 
         t_write(ORDER)
         t_enter(1, delay_between=1.5)
         t_wait(2.0)
-        # Validar mensaje de estatus de orden antes de continuar
+        # Log y validación de estatus de orden antes de continuar
+        t_debug_log_screen("Pantalla después de ingresar orden (TN5250)")
         t_check_invalid_order_status(ORDER or "")
         t_press_key("F7")
-        t_wait(20.0)
+        t_wait(5.0)
+        t_debug_log_screen("Pantalla después de F7 (resultado de facturación)")
+        t_wait(15.0)
 
         log("✅ [TN5250] Job finalizado.")
     finally:
@@ -849,7 +874,7 @@ def run_job_ui(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times: in
             log_warn(f"⚠ (UI) Error al leer pantalla para validar estatus de orden (intento {intento+1}): {e}")
             full_screen = ""
 
-        if ORDER_STATUS_INVALID_TEXT in full_screen.lower():
+        if ORDER_STATUS_INVALID_SUBSTR in full_screen.lower():
             ui_error_detected = True
             log_err(
                 f"❌ (UI) Estatus de la orden inválido detectado para orden '{ORDER}' "
