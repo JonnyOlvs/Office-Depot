@@ -81,8 +81,6 @@ else:
 # Estas firmas se usan en:
 # - UI: detect_screen() vía get_screen_text (copy de la pantalla del emulador).
 # - TN5250: t_detect_screen_name() como apoyo para MASTER_MENU.
-# Para pantallas especiales (mensajes de programa / JDA) usamos firmas
-# basadas en el texto real que devuelve la pantalla.
 SCREENS = {
     "MASTER_MENU": [
         "Menu: MASTER",
@@ -96,7 +94,18 @@ SCREENS = {
         "J D A  S O F T W A R E",
         "P O R T F O L I O   M E R C H A N D I S E",
     ],
+    "FACT_MENU": [
+        "Office Depot de México, S.A. de C.V.",
+        "MENU DE FACTURACIÓN VERSIÓN 2004",
+    ],
+    "FACT_BY_ORDER": [
+        "Office Depot de México, S.A. de C.V.",
+        "Facturación Por Número de Orden",
+    ],
 }
+
+# Texto genérico de error de estatus de orden
+ORDER_STATUS_INVALID_TEXT = "estatus de la orden inválido"
 
 # ====================================================
 # =============== SECCIÓN AS400 / VENTANAS (UI) ======
@@ -536,17 +545,42 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
         una excepción para que el flujo de CI marque la fila
         como fallida.
         """
+        for intento in range(3):
+            try:
+                raw = client.getScreen() or ""
+            except Exception as e:
+                log_warn(
+                    f"⚠ [TN5250] No se pudo leer pantalla para validar estatus de orden "
+                    f"(intento {intento+1}): {e}"
+                )
+                raw = ""
+
+            if ORDER_STATUS_INVALID_TEXT in (raw or "").lower():
+                log_err(
+                    f"❌ [TN5250] Estatus de la orden inválido para orden '{order}' "
+                    f"(intento {intento+1})."
+                )
+                raise RuntimeError(f"Estatus de la orden inválido para orden '{order}'")
+
+            t_wait(1.0)
+
+    def t_expect_screen(expected_name: str, context: str):
+        """
+        Valida la pantalla actual en TN5250 usando t_detect_screen_name.
+        Solo loguea advertencias; no interrumpe el flujo.
+        """
         try:
-            raw = client.getScreen() or ""
+            screen_name = t_detect_screen_name()
         except Exception as e:
-            log_warn(f"⚠ [TN5250] No se pudo leer pantalla para validar estatus de orden: {e}")
+            log_warn(f"⚠ [TN5250] No se pudo detectar la pantalla {context}: {e}")
             return
 
-        tlow = raw.lower()
-        # Buscamos una subcadena robusta sin depender del acento exacto
-        if "estatus de la orden inval" in tlow:
-            log_err(f"❌ [TN5250] Estatus de la orden inválido para orden '{order}'.")
-            raise RuntimeError(f"Estatus de la orden inválido para orden '{order}'")
+        log(f"📺 [TN5250] Pantalla {context}: {screen_name}")
+        if screen_name != expected_name:
+            log_warn(
+                f"⚠ [TN5250] Pantalla inesperada {context}. "
+                f"Esperada='{expected_name}', obtenida='{screen_name}'."
+            )
 
     def t_skip_program_messages_if_any(max_retries: int = 10, delay: float = 1.0):
         """
@@ -671,8 +705,14 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
         t_tabs(1)
         t_write("MENFAC")
         t_enter(1, delay_between=1.5)
+        # Validar menú principal de facturación
+        t_expect_screen("FACT_MENU", "después de MENFAC (menú principal de Facturación)")
+
         t_write("5")
         t_enter(1, delay_between=1.5)
+        # Validar pantalla 'Facturación Por Número de Orden'
+        t_expect_screen("FACT_BY_ORDER", "después de opción 5 (Facturación por número de orden)")
+
         t_write(ORDER)
         t_enter(1, delay_between=1.5)
         t_wait(2.0)
@@ -717,6 +757,21 @@ def run_job_ui(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times: in
         raise RuntimeError("No se encontró la ventana del emulador AS400.")
 
     time.sleep(DELAY_BEFORE_TYPE)
+
+    # Helper local para validar pantallas en UI usando SCREENS/detect_screen
+    def ui_expect_screen(expected_name: str, contexto: str):
+        try:
+            screen_name, _ = detect_screen()
+            log(f"📺 (UI) Pantalla {contexto}: {screen_name}")
+        except Exception as e:
+            log_warn(f"⚠ (UI) No se pudo detectar la pantalla {contexto}: {e}")
+            return
+
+        if screen_name != expected_name:
+            log_warn(
+                f"⚠ (UI) Pantalla inesperada {contexto}. "
+                f"Esperada='{expected_name}', obtenida='{screen_name}'."
+            )
 
     # Login simple
     log("🔐 Ejecutando login (UI)...")
@@ -773,11 +828,42 @@ def run_job_ui(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times: in
     tabs(1)
     write("MENFAC")
     enter(1, delay_between=1.5)
+    # Validar que estamos en el MENÚ PRINCIPAL DE FACTURACIÓN
+    ui_expect_screen("FACT_MENU", "después de MENFAC (menú principal de Facturación)")
+
     write("5")
     enter(1, delay_between=1.5)
+    # Validar que estamos en 'Facturación Por Número de Orden'
+    ui_expect_screen("FACT_BY_ORDER", "después de opción 5 (Facturación por número de orden)")
+
     write(ORDER)
     enter(1, delay_between=1.5)
-    wait(2.0)
+
+    # Validar si aparece mensaje de estatus de orden inválido antes de continuar
+    # Hacemos varias lecturas seguidas porque el mensaje puede parpadear.
+    ui_error_detected = False
+    for intento in range(3):
+        try:
+            full_screen = get_screen_text()
+        except Exception as e:
+            log_warn(f"⚠ (UI) Error al leer pantalla para validar estatus de orden (intento {intento+1}): {e}")
+            full_screen = ""
+
+        if ORDER_STATUS_INVALID_TEXT in full_screen.lower():
+            ui_error_detected = True
+            log_err(
+                f"❌ (UI) Estatus de la orden inválido detectado para orden '{ORDER}' "
+                f"en intento {intento+1}."
+            )
+            break
+
+        wait(1.0)
+
+    if ui_error_detected:
+        msg = f"Estatus de la orden inválido para orden '{ORDER}' (UI)."
+        raise RuntimeError(msg)
+
+    wait(3.0)
     press_key("F7")
     wait(20.0)
 
