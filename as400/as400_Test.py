@@ -660,6 +660,9 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
         # Damos un pequeño tiempo para que la primera pantalla esté lista
         t_wait(DELAY_BEFORE_TYPE)
 
+        # Log de depuración: cómo se ve la pantalla ANTES de intentar login
+        t_debug_log_screen("Pantalla antes de login (TN5250)")
+
         # Login simple
         log("🔐 [TN5250] Ejecutando login...")
         t_wait(3.0)
