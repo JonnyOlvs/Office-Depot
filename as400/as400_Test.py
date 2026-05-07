@@ -78,10 +78,23 @@ else:
     kernel32 = None
 
 # ====== FIRMAS DE PANTALLAS ======
+# Estas firmas se usan en:
+# - UI: detect_screen() vía get_screen_text (copy de la pantalla del emulador).
+# - TN5250: t_detect_screen_name() como apoyo para MASTER_MENU.
+# Para pantallas especiales (mensajes de programa / JDA) usamos firmas
+# basadas en el texto real que devuelve la pantalla.
 SCREENS = {
     "MASTER_MENU": [
         "Menu: MASTER",
         "Sistemas de Mercancías",
+    ],
+    "PROGRAM_MESSAGES": [
+        "Visualizar Mensajes de Programa",
+        "Pulse Intro para continuar.",
+    ],
+    "JDA_SPLASH": [
+        "J D A  S O F T W A R E",
+        "P O R T F O L I O   M E R C H A N D I S E",
     ],
 }
 
@@ -464,15 +477,56 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
     def t_wait(seconds):
         time.sleep(float(seconds))
 
-    def t_detect_screen_name():
+    def t_read_screen_raw():
         try:
-            raw = client.getScreen() or ""
-        except Exception:
-            raw = ""
+            return client.getScreen() or ""
+        except Exception as e:
+            log_warn(f"⚠ [TN5250] No se pudo leer pantalla: {e}")
+            return ""
+
+    def t_debug_log_screen(label: str, max_lines: int = 8):
+        """
+        Log auxiliar para entender exactamente qué texto devuelve getScreen()
+        en ciertos puntos (por ejemplo justo después de login).
+        """
+        raw = t_read_screen_raw()
+        if not raw:
+            log_warn(f"🔎 [TN5250] {label}: pantalla vacía o no legible.")
+            return
+        lines = raw.splitlines()
+        snippet = "\n".join(lines[:max_lines])
+        log(
+            f"🔎 [TN5250] {label} - primeras {min(max_lines, len(lines))} lineas de pantalla:\n"
+            f"{snippet}"
+        )
+
+    def t_detect_screen_name():
+        """
+        Detecta la pantalla actual a partir del texto devuelto por getScreen.
+        - PROGRAM_MESSAGES: 'Visualizar Mensajes de Programa' / 'Pulse Intro para continuar.'
+        - JDA_SPLASH: pantalla splash de JDA (texto con letras separadas por espacios)
+        - MASTER_MENU: usa firmas de SCREENS (UI/TN5250)
+        """
+        raw = t_read_screen_raw()
         tlow = raw.lower()
+        tcompact = tlow.replace(" ", "")
+
+        # 1) Pantalla de mensajes de programa
+        if (
+            "visualizar mensajes de programa" in tlow
+            or "pulse intro para continuar" in tlow
+        ):
+            return "PROGRAM_MESSAGES"
+
+        # 2) Pantalla splash de JDA (texto viene con letras separadas por espacios)
+        if "jdasoftwaregroup" in tcompact or "portfoliomerchandisemanagementi" in tcompact:
+            return "JDA_SPLASH"
+
+        # 3) Resto de pantallas conocidas (por ahora solo MASTER_MENU)
         for name, markers in SCREENS.items():
             if all(m.lower() in tlow for m in markers):
                 return name
+
         return "UNKNOWN"
 
     def t_check_invalid_order_status(order: str):
@@ -494,6 +548,67 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
             log_err(f"❌ [TN5250] Estatus de la orden inválido para orden '{order}'.")
             raise RuntimeError(f"Estatus de la orden inválido para orden '{order}'")
 
+    def t_skip_program_messages_if_any(max_retries: int = 10, delay: float = 1.0):
+        """
+        Algunos usuarios, después del login, ven una pantalla intermedia
+        'Visualizar Mensajes de Programa' con el texto 'Pulse Intro para continuar.'.
+        Si detectamos esa pantalla, mandamos un ENTER extra para continuar.
+        Hacemos varios reintentos breves porque la pantalla puede tardar en aparecer.
+        """
+        # Espera inicial para dar tiempo a que aparezca la pantalla intermedia
+        t_wait(delay)
+
+        for i in range(max_retries):
+            raw = t_read_screen_raw()
+            tlow = raw.lower()
+            # Detección laxa de la pantalla de mensajes de programa:
+            # buscamos palabras clave en vez de la frase exacta porque
+            # suelen venir con varios espacios intermedios.
+            if (
+                ("visualizar" in tlow and "mensajes" in tlow and "programa" in tlow)
+                or ("pulse" in tlow and "intro" in tlow and "continuar" in tlow)
+            ):
+                log(
+                    f"ℹ️ [TN5250] Pantalla 'Visualizar Mensajes de Programa' detectada "
+                    f"(intento {i+1}). Enviando ENTER para continuar a pantalla JDA..."
+                )
+                # 1) Cerrar la pantalla de mensajes
+                t_enter(1, delay_between=delay)
+                t_wait(2.0)
+
+                # 2) Esperar explícitamente a la pantalla JDA y enviar ENTER ahí
+                for j in range(max_retries):
+                    raw_jda = t_read_screen_raw()
+                    tlow_jda = raw_jda.lower()
+                    if (
+                        "jda" in tlow_jda
+                        and "software" in tlow_jda
+                        and "group" in tlow_jda
+                    ):
+                        log(
+                            f"ℹ️ [TN5250] Pantalla JDA detectada (intento {j+1} tras mensajes). "
+                            "Enviando ENTER para continuar al menú principal..."
+                        )
+                        t_enter(1, delay_between=delay)
+                        t_wait(2.0)
+                        return
+                    t_wait(delay)
+
+                # Si no vimos JDA pero sí la pantalla de mensajes, salimos igual
+                return
+
+            # Caso alterno: no hubo pantalla de mensajes pero ya estamos en JDA,
+            # enviamos un solo ENTER para avanzar al menú.
+            if "jda" in tlow and "software" in tlow and "group" in tlow:
+                log(
+                    f"ℹ️ [TN5250] Pantalla JDA detectada sin mensajes previos (intento {i+1}). "
+                    "Enviando ENTER para continuar al menú principal..."
+                )
+                t_enter(1, delay_between=delay)
+                t_wait(2.0)
+                return
+            t_wait(delay)
+
     try:
         # Damos un pequeño tiempo para que la primera pantalla esté lista
         t_wait(DELAY_BEFORE_TYPE)
@@ -509,17 +624,40 @@ def run_job_tn5250(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times
         t_enter(2, delay_between=1.5)
         log("✅ [TN5250] Login completado.")
 
-        try:
-            screen_name = t_detect_screen_name()
-            log(f"📺 [TN5250] Pantalla detectada después de login: {screen_name}")
-        except Exception as e:
-            log_warn(f"⚠ [TN5250] No se pudo detectar la pantalla: {e}")
+        # Normalizamos la pantalla después del login:
+        # - Si es PROGRAM_MESSAGES → ENTER para ir a JDA
+        # - Si es JDA_SPLASH → ENTER para ir a MASTER_MENU
+        # - Si es MASTER_MENU o cualquier otra → seguimos sin ENTER extra
+        for step in range(3):
+            label = f"Pantalla después de login (paso {step+1})"
+            t_debug_log_screen(label)
+            try:
+                screen_name = t_detect_screen_name()
+            except Exception as e:
+                log_warn(f"⚠ [TN5250] No se pudo detectar la pantalla en {label}: {e}")
+                break
+
+            log(f"📺 [TN5250] {label}: {screen_name}")
+
+            if screen_name in ("PROGRAM_MESSAGES", "JDA_SPLASH"):
+                log(
+                    f"ℹ️ [TN5250] Pantalla intermedia '{screen_name}' detectada "
+                    "después de login. Enviando ENTER para avanzar..."
+                )
+                t_enter(1, delay_between=1.5)
+                t_wait(2.0)
+                # seguimos el loop para reevaluar la nueva pantalla
+                continue
+
+            # Ya no estamos en pantallas intermedias; continuamos flujo normal
+            break
 
         # Cambio de Localidad
         t_wait(2.0)
         t_tabs(1)
         t_write("MENOP1")
         t_enter(1, delay_between=1.5)
+
         t_write("27")
         t_enter(1, delay_between=1.5)
         t_write("MUD001")
@@ -591,11 +729,31 @@ def run_job_ui(USER: str, PASS: str, ORDER: str, LOCALIDAD: str, login_times: in
     enter(2, delay_between=1.5)
     log("✅ Login completado (UI).")
 
-    try:
-        screen_name, _ = detect_screen()
-        log(f"📺 Pantalla detectada después de login: {screen_name}")
-    except Exception as e:
-        log_warn(f"⚠ No se pudo detectar la pantalla: {e}")
+    # Normalizamos la pantalla después del login para el emulador UI:
+    # - PROGRAM_MESSAGES → ENTER para ir a JDA
+    # - JDA_SPLASH → ENTER para ir a MASTER_MENU
+    # - MASTER_MENU u otra → seguimos sin ENTER extra
+    for step in range(3):
+        try:
+            screen_name, _ = detect_screen()
+        except Exception as e:
+            log_warn(f"⚠ No se pudo detectar la pantalla (UI) después de login en paso {step+1}: {e}")
+            break
+
+        log(f"📺 (UI) Pantalla después de login (paso {step+1}): {screen_name}")
+
+        if screen_name in ("PROGRAM_MESSAGES", "JDA_SPLASH"):
+            log(
+                f"ℹ️ (UI) Pantalla intermedia '{screen_name}' detectada después de login. "
+                "Enviando ENTER para avanzar..."
+            )
+            enter(1, delay_between=1.5)
+            wait(2.0)
+            # Re-evaluamos la nueva pantalla en la siguiente iteración
+            continue
+
+        # Ya no estamos en pantallas intermedias; continuamos flujo normal
+        break
 
     # Cambio de Localidad
     wait(2.0)
